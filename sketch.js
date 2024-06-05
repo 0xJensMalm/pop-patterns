@@ -11,7 +11,7 @@ let globalColors = [];
 let maxLines = 5; // Maximum number of lines per pattern
 let themeIndex = 0; // Index to keep track of the current color theme
 let mode = "default"; // Modes: "default", "parallels", "dynamic"
-let seed = 0x798383228c;
+let seed = 0x7312876db4;
 const originalWidth = 4000;
 const originalHeight = 4400;
 
@@ -53,6 +53,14 @@ let themes = [
   {
     name: "Pop",
     colors: ["#00ff3f", "#35b5ff", "#ff479c", "#fffb38"],
+  },
+  {
+    name: "Meadow",
+    colors: ["#556B2F", "#8FBC8F", "#FFD700", "#FF8C00", "#2E8B57"],
+  },
+  {
+    name: "Sunset",
+    colors: ["#FF4500", "#FF8C00", "#FFD700", "#2E8B57", "#6A5ACD"],
   },
 ]; // Array of color themes
 
@@ -125,7 +133,7 @@ function drawSignature() {
   textAlign(RIGHT, CENTER);
   fill(globalColors[colorIndex]);
   text(
-    "GP // 1001",
+    "GP // 1005",
     centerX -
       (globalColors.length * (colorCubeSize + colorCubeSpacing)) / 2 +
       titleHorizontalOffset,
@@ -192,7 +200,7 @@ function drawSignatureHighRes() {
   pg.textAlign(pg.RIGHT, pg.CENTER);
   pg.fill(globalColors[colorIndex]);
   pg.text(
-    "GP // 1001",
+    "GP // 1005",
     centerX -
       (globalColors.length * (colorCubeSize + colorCubeSpacing)) / 2 +
       titleHorizontalOffset * scaleFactor,
@@ -476,6 +484,6 @@ function keyPressed() {
 function keyTyped() {
   if (key === "s") {
     drawHighResPatterns();
-    pg.save("high_res_image.png");
+    pg.save(`${seed}.png`);
   }
 }

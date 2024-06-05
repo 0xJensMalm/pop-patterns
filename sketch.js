@@ -11,9 +11,15 @@ let globalColors = [];
 let maxLines = 5; // Maximum number of lines per pattern
 let themeIndex = 0; // Index to keep track of the current color theme
 let mode = "default"; // Modes: "default", "parallels", "dynamic"
-let seed = [];
+let seed = 0x798383228c;
 const originalWidth = 4000;
 const originalHeight = 4400;
+
+let titleHorizontalOffset = -180; // Adjust horizontal position of title
+let seedHorizontalOffset = 125; // Adjust horizontal position of seed
+let cubeVerticalOffset = 15; // Adjust vertical offset position of the cubes
+let colorIndex = 0; // Index to keep track of the current color in the theme
+let signatureVerticalOffset = -25; // Global variable to adjust the vertical position of the entire signature
 
 let themes = [
   {
@@ -96,18 +102,18 @@ function drawPatterns() {
 function drawSignature() {
   let lineWidth = width * 0.75;
   let centerX = width / 2;
-  let lineY = height - paddingBottom * 0.8;
+  let lineY = height - paddingBottom * 0.8 + signatureVerticalOffset;
   let colorCubeSize = 10;
   let colorCubeSpacing = 2;
-  let colorsY = lineY + 10;
+  let colorsY = lineY + cubeVerticalOffset;
 
   let seedTextSize = 12;
   let titleTextSize = 12;
   let horizontalPadding = 120; // Adjust horizontal padding as needed
 
-  let textY = colorsY + colorCubeSize / 2; // Y-coordinate for title and seed text
+  let textY = lineY + 10 + colorCubeSize / 2; // Y-coordinate for title and seed text
 
-  stroke(255);
+  stroke(globalColors[colorIndex]);
   strokeWeight(2);
   line(centerX - lineWidth / 2, lineY, centerX + lineWidth / 2, lineY);
 
@@ -117,12 +123,12 @@ function drawSignature() {
   // Draw title text
   textSize(titleTextSize);
   textAlign(RIGHT, CENTER);
-  fill(255);
+  fill(globalColors[colorIndex]);
   text(
     "GP // 1001",
     centerX -
-      (globalColors.length * (colorCubeSize + colorCubeSpacing)) / 2 -
-      horizontalPadding,
+      (globalColors.length * (colorCubeSize + colorCubeSpacing)) / 2 +
+      titleHorizontalOffset,
     textY
   );
 
@@ -145,11 +151,79 @@ function drawSignature() {
   // Draw seed text
   textSize(seedTextSize);
   textAlign(LEFT, CENTER);
+  fill(globalColors[colorIndex]);
   text(
     `seed: ${seed}`,
     centerX +
       (globalColors.length * (colorCubeSize + colorCubeSpacing)) / 2 +
-      horizontalPadding,
+      seedHorizontalOffset,
+    textY
+  );
+}
+
+function drawSignatureHighRes() {
+  let scaleFactor = originalWidth / width;
+
+  let lineWidth = originalWidth * 0.75;
+  let centerX = originalWidth / 2;
+  let lineY =
+    originalHeight -
+    paddingBottom * scaleFactor * 0.8 +
+    signatureVerticalOffset * scaleFactor;
+  let colorCubeSize = 10 * scaleFactor; // Adjusted for high resolution
+  let colorCubeSpacing = 2 * scaleFactor;
+  let colorsY = lineY + cubeVerticalOffset * scaleFactor;
+
+  let seedTextSize = 12 * scaleFactor;
+  let titleTextSize = 12 * scaleFactor;
+  let horizontalPadding = 120 * scaleFactor; // Adjust horizontal padding as needed
+
+  let textY = lineY + 10 * scaleFactor + colorCubeSize / 2; // Y-coordinate for title and seed text
+
+  pg.stroke(globalColors[colorIndex]);
+  pg.strokeWeight(2 * scaleFactor);
+  pg.line(centerX - lineWidth / 2, lineY, centerX + lineWidth / 2, lineY);
+
+  pg.noStroke();
+  pg.textFont("Helvetica");
+
+  // Draw title text
+  pg.textSize(titleTextSize);
+  pg.textAlign(pg.RIGHT, pg.CENTER);
+  pg.fill(globalColors[colorIndex]);
+  pg.text(
+    "GP // 1001",
+    centerX -
+      (globalColors.length * (colorCubeSize + colorCubeSpacing)) / 2 +
+      titleHorizontalOffset * scaleFactor,
+    textY
+  );
+
+  // Draw color cubes
+  let colorsXStart =
+    centerX -
+    (globalColors.length * colorCubeSize +
+      (globalColors.length - 1) * colorCubeSpacing) /
+      2;
+  for (let i = 0; i < globalColors.length; i++) {
+    pg.fill(globalColors[i]);
+    pg.rect(
+      colorsXStart + i * (colorCubeSize + colorCubeSpacing),
+      colorsY - colorCubeSize / 2,
+      colorCubeSize,
+      colorCubeSize
+    );
+  }
+
+  // Draw seed text
+  pg.textSize(seedTextSize);
+  pg.textAlign(pg.LEFT, pg.CENTER);
+  pg.fill(globalColors[colorIndex]);
+  pg.text(
+    `seed: ${seed}`,
+    centerX +
+      (globalColors.length * (colorCubeSize + colorCubeSpacing)) / 2 +
+      seedHorizontalOffset * scaleFactor,
     textY
   );
 }
@@ -180,69 +254,6 @@ function drawHighResPatterns() {
   }
   pg.translate(-scaledPaddingLeft, -scaledPaddingTop); // Reset translation
   drawSignatureHighRes();
-}
-
-function drawSignatureHighRes() {
-  let scaleFactor = originalWidth / width;
-
-  let lineWidth = originalWidth * 0.75;
-  let centerX = originalWidth / 2;
-  let lineY = originalHeight - paddingBottom * scaleFactor * 0.8;
-  let colorCubeSize = 10 * scaleFactor; // Adjusted for high resolution
-  let colorCubeSpacing = 2 * scaleFactor;
-  let colorsY = lineY + 10 * scaleFactor;
-
-  let seedTextSize = 12 * scaleFactor;
-  let titleTextSize = 12 * scaleFactor;
-  let horizontalPadding = 120 * scaleFactor; // Adjust horizontal padding as needed
-
-  let textY = colorsY + colorCubeSize / 2; // Y-coordinate for title and seed text
-
-  pg.stroke(255);
-  pg.strokeWeight(2 * scaleFactor);
-  pg.line(centerX - lineWidth / 2, lineY, centerX + lineWidth / 2, lineY);
-
-  pg.noStroke();
-  pg.textFont("Helvetica");
-
-  // Draw title text
-  pg.textSize(titleTextSize);
-  pg.textAlign(pg.RIGHT, pg.CENTER);
-  pg.fill(255);
-  pg.text(
-    "GP // 1001",
-    centerX -
-      (globalColors.length * (colorCubeSize + colorCubeSpacing)) / 2 -
-      horizontalPadding,
-    textY
-  );
-
-  // Draw color cubes
-  let colorsXStart =
-    centerX -
-    (globalColors.length * colorCubeSize +
-      (globalColors.length - 1) * colorCubeSpacing) /
-      2;
-  for (let i = 0; i < globalColors.length; i++) {
-    pg.fill(globalColors[i]);
-    pg.rect(
-      colorsXStart + i * (colorCubeSize + colorCubeSpacing),
-      colorsY - colorCubeSize / 2,
-      colorCubeSize,
-      colorCubeSize
-    );
-  }
-
-  // Draw seed text
-  pg.textSize(seedTextSize);
-  pg.textAlign(pg.LEFT, pg.CENTER);
-  pg.text(
-    `seed: ${seed}`,
-    centerX +
-      (globalColors.length * (colorCubeSize + colorCubeSpacing)) / 2 +
-      horizontalPadding,
-    textY
-  );
 }
 
 function windowResized() {
@@ -447,6 +458,17 @@ function keyPressed() {
     console.log("New Seed:", seed);
     randomSeed(parseInt(seed));
     generateGlobalPatternAndColors();
+    redraw();
+  } else if (upperKey === "C") {
+    colorIndex = (colorIndex + 1) % globalColors.length;
+    redraw();
+  } else if (upperKey === "V") {
+    // Increase signature vertical offset
+    signatureVerticalOffset += 10;
+    redraw();
+  } else if (upperKey === "B") {
+    // Decrease signature vertical offset
+    signatureVerticalOffset -= 10;
     redraw();
   }
 }

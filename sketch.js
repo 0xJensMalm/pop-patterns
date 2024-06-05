@@ -11,7 +11,7 @@ let globalColors = [];
 let maxLines = 5; // Maximum number of lines per pattern
 let themeIndex = 0; // Index to keep track of the current color theme
 let mode = "default"; // Modes: "default", "parallels", "dynamic"
-let seed = 0xc4fe82f92c;
+let seed = [];
 const originalWidth = 4000;
 const originalHeight = 4400;
 
@@ -62,6 +62,7 @@ function generateSeed() {
 }
 
 function setup() {
+  seed = generateSeed(); // Generate seed here
   createCanvas(windowWidth, windowHeight); // Adjust canvas size to window size
   pg = createGraphics(originalWidth, originalHeight); // Create high-resolution buffer
   pixelDensity(1); // Ensure high-resolution saving
@@ -99,11 +100,12 @@ function drawSignature() {
   let colorCubeSize = 10;
   let colorCubeSpacing = 2;
   let colorsY = lineY + 10;
-  let textY = colorsY + colorCubeSize + 8;
 
   let seedTextSize = 12;
   let titleTextSize = 12;
-  let titleSpacing = 10;
+  let horizontalPadding = 120; // Adjust horizontal padding as needed
+
+  let textY = colorsY + colorCubeSize / 2; // Y-coordinate for title and seed text
 
   stroke(255);
   strokeWeight(2);
@@ -112,11 +114,17 @@ function drawSignature() {
   noStroke();
   textFont("Helvetica");
 
-  // Draw seed text
-  textSize(seedTextSize);
-  textAlign(CENTER, CENTER);
+  // Draw title text
+  textSize(titleTextSize);
+  textAlign(RIGHT, CENTER);
   fill(255);
-  text(`seed: ${seed}`, centerX, textY);
+  text(
+    "GP // 1001",
+    centerX -
+      (globalColors.length * (colorCubeSize + colorCubeSpacing)) / 2 -
+      horizontalPadding,
+    textY
+  );
 
   // Draw color cubes
   let colorsXStart =
@@ -128,22 +136,36 @@ function drawSignature() {
     fill(globalColors[i]);
     rect(
       colorsXStart + i * (colorCubeSize + colorCubeSpacing),
-      colorsY,
+      colorsY - colorCubeSize / 2,
       colorCubeSize,
       colorCubeSize
     );
   }
 
-  // Draw title
-  textSize(titleTextSize);
+  // Draw seed text
+  textSize(seedTextSize);
   textAlign(LEFT, CENTER);
-  text("TITLE // TITLE", centerX + lineWidth / 2 + titleSpacing, textY);
+  text(
+    `seed: ${seed}`,
+    centerX +
+      (globalColors.length * (colorCubeSize + colorCubeSpacing)) / 2 +
+      horizontalPadding,
+    textY
+  );
 }
 
 function drawHighResPatterns() {
+  let scaleFactor = originalWidth / width;
+
+  let scaledPaddingTop = paddingTop * scaleFactor;
+  let scaledPaddingBottom = paddingBottom * scaleFactor;
+  let scaledPaddingLeft = paddingLeft * scaleFactor;
+  let scaledPaddingRight = paddingRight * scaleFactor;
+
   pg.background(40);
-  pg.translate(paddingLeft, paddingTop); // Translate to start drawing with padding
-  let highResCellSize = (originalWidth - paddingLeft - paddingRight) / cols;
+  pg.translate(scaledPaddingLeft, scaledPaddingTop); // Translate to start drawing with padding
+  let highResCellSize =
+    (originalWidth - scaledPaddingLeft - scaledPaddingRight) / cols;
   for (let i = 0; i < cols; i++) {
     for (let j = 0; j < rows; j++) {
       pg.push();
@@ -156,36 +178,71 @@ function drawHighResPatterns() {
       pg.pop();
     }
   }
+  pg.translate(-scaledPaddingLeft, -scaledPaddingTop); // Reset translation
   drawSignatureHighRes();
 }
 
 function drawSignatureHighRes() {
-  let lineWidth = originalWidth * 0.8;
-  let lineY = originalHeight - paddingBottom / 2;
-  let colorsY = lineY + 20;
-  let textY = colorsY + 20;
+  let scaleFactor = originalWidth / width;
+
+  let lineWidth = originalWidth * 0.75;
   let centerX = originalWidth / 2;
+  let lineY = originalHeight - paddingBottom * scaleFactor * 0.8;
+  let colorCubeSize = 10 * scaleFactor; // Adjusted for high resolution
+  let colorCubeSpacing = 2 * scaleFactor;
+  let colorsY = lineY + 10 * scaleFactor;
+
+  let seedTextSize = 12 * scaleFactor;
+  let titleTextSize = 12 * scaleFactor;
+  let horizontalPadding = 120 * scaleFactor; // Adjust horizontal padding as needed
+
+  let textY = colorsY + colorCubeSize / 2; // Y-coordinate for title and seed text
 
   pg.stroke(255);
-  pg.strokeWeight(2);
+  pg.strokeWeight(2 * scaleFactor);
   pg.line(centerX - lineWidth / 2, lineY, centerX + lineWidth / 2, lineY);
 
   pg.noStroke();
   pg.textFont("Helvetica");
-  pg.textSize(24);
-  pg.textAlign(CENTER, CENTER);
-  pg.fill(255);
-  pg.text(`seed: ${seed}`, centerX, textY);
 
-  let colorsXStart = centerX - (globalColors.length * 10) / 2;
+  // Draw title text
+  pg.textSize(titleTextSize);
+  pg.textAlign(pg.RIGHT, pg.CENTER);
+  pg.fill(255);
+  pg.text(
+    "GP // 1001",
+    centerX -
+      (globalColors.length * (colorCubeSize + colorCubeSpacing)) / 2 -
+      horizontalPadding,
+    textY
+  );
+
+  // Draw color cubes
+  let colorsXStart =
+    centerX -
+    (globalColors.length * colorCubeSize +
+      (globalColors.length - 1) * colorCubeSpacing) /
+      2;
   for (let i = 0; i < globalColors.length; i++) {
     pg.fill(globalColors[i]);
-    pg.rect(colorsXStart + i * 10, colorsY, 10, 10);
+    pg.rect(
+      colorsXStart + i * (colorCubeSize + colorCubeSpacing),
+      colorsY - colorCubeSize / 2,
+      colorCubeSize,
+      colorCubeSize
+    );
   }
 
-  pg.textSize(18);
-  pg.textAlign(LEFT, CENTER);
-  pg.text("TITLE // TITLE", centerX + lineWidth / 2 + 10, textY);
+  // Draw seed text
+  pg.textSize(seedTextSize);
+  pg.textAlign(pg.LEFT, pg.CENTER);
+  pg.text(
+    `seed: ${seed}`,
+    centerX +
+      (globalColors.length * (colorCubeSize + colorCubeSpacing)) / 2 +
+      horizontalPadding,
+    textY
+  );
 }
 
 function windowResized() {

@@ -1,5 +1,65 @@
 // Constants and configuration
 const CONFIG = {
+  MODES: {
+    default: {
+      name: "Default",
+      shapeMode: "default",
+      maxLines: 5,
+      gridDivisor: 4,
+      properties: {
+        lineWidth: 2,
+        opacity: 1.0,
+        rotation: 0,
+      },
+    },
+    triangle: {
+      name: "Triangle",
+      shapeMode: "triangle",
+      maxLines: 7,
+      gridDivisor: 3,
+      properties: {
+        lineWidth: 3,
+        opacity: 0.8,
+        rotation: 45,
+      },
+    },
+    hexagon: {
+      name: "Hexagon",
+      shapeMode: "hexagon",
+      maxLines: 4,
+      gridDivisor: 4,
+      properties: {
+        lineWidth: 2,
+        opacity: 0.9,
+        rotation: 30,
+        radius: 0.4, // relative to cell size
+      },
+    },
+    diamond: {
+      name: "Diamond",
+      shapeMode: "diamond",
+      maxLines: 5,
+      gridDivisor: 3,
+      properties: {
+        lineWidth: 2,
+        opacity: 0.85,
+        rotation: 0,
+        stretch: 1.5, // vertical stretch factor
+      },
+    },
+    arc: {
+      name: "Arc",
+      shapeMode: "arc",
+      maxLines: 6,
+      gridDivisor: 4,
+      properties: {
+        lineWidth: 3,
+        opacity: 0.9,
+        rotation: 0,
+        arcSpan: 180, // degrees
+      },
+    },
+  },
   GRID: {
     WIDTH: 10,
     HEIGHT: 10,
@@ -35,7 +95,7 @@ class GenerativeArtwork {
       colors: [],
       maxLines: 5,
       themeIndex: 0,
-      shapeMode: "default",
+      currentMode: "default",
       seed: "0xc3f7f484d5",
       colorIndex: 0,
     };
@@ -199,23 +259,145 @@ class GenerativeArtwork {
   }
 
   generatePattern() {
-    const points = this.generateGridPoints();
+    const modeConfig = CONFIG.MODES[this.state.currentMode];
+    const points = this.generateGridPoints(modeConfig.gridDivisor);
+
+    switch (modeConfig.shapeMode) {
+      case "triangle":
+        return this.generateTrianglePattern(points);
+      case "hexagon":
+        return this.generateHexagonPattern(points);
+      case "diamond":
+        return this.generateDiamondPattern(points);
+      case "arc":
+        return this.generateArcPattern(points);
+      default:
+        return this.generateDefaultPattern(points);
+    }
+  }
+
+  generateDefaultPattern(points) {
     return this.createLines(points);
   }
 
-  generateDefaultPattern() {
-    const points = this.generateGridPoints();
-    return this.createLines(points, false);
+  generateTrianglePattern(points) {
+    const lines = [];
+    const angles = [];
+    let attempts = 0;
+    const MAX_ATTEMPTS = 1000;
+
+    while (lines.length < this.state.maxLines && attempts < MAX_ATTEMPTS) {
+      const start = random(points);
+      const end = random(points);
+      const midPoint = createVector(end.x, start.y);
+
+      if (!start.equals(end)) {
+        lines.push([start, end]);
+        angles.push(degrees(p5.Vector.sub(end, start).heading()));
+      }
+      attempts++;
+    }
+
+    if (lines.length === 0) {
+      lines.push([
+        createVector(0, 0),
+        createVector(this.state.cellSize, this.state.cellSize),
+      ]);
+      angles.push(45);
+    }
+
+    return { lines, angles };
   }
 
-  generateParallelPattern() {
-    const points = this.generateGridPoints(6);
-    return this.createParallelLines();
+  generateHexagonPattern(points) {
+    const lines = [];
+    const angles = [];
+    let attempts = 0;
+    const MAX_ATTEMPTS = 1000;
+
+    while (lines.length < this.state.maxLines && attempts < MAX_ATTEMPTS) {
+      const center = random(points);
+      const radius = this.state.cellSize * CONFIG.MODES.hexagon.properties.radius;
+      const startAngle = random(TWO_PI);
+      
+      // Generate two connected points on the hexagon
+      const angle1 = startAngle;
+      const angle2 = startAngle + TWO_PI / 6;
+      
+      const start = createVector(
+        center.x + cos(angle1) * radius,
+        center.y + sin(angle1) * radius
+      );
+      const end = createVector(
+        center.x + cos(angle2) * radius,
+        center.y + sin(angle2) * radius
+      );
+
+      if (!start.equals(end)) {
+        lines.push([start, end]);
+        angles.push(degrees(angle1));
+      }
+      attempts++;
+    }
+
+    return { lines, angles };
   }
 
-  generateDynamicPattern() {
-    const points = this.generateGridPoints(4);
-    return this.createLines(points, true);
+  generateDiamondPattern(points) {
+    const lines = [];
+    const angles = [];
+    let attempts = 0;
+    const MAX_ATTEMPTS = 1000;
+
+    while (lines.length < this.state.maxLines && attempts < MAX_ATTEMPTS) {
+      const start = random(points);
+      const end = random(points);
+      
+      if (!start.equals(end)) {
+        const stretch = CONFIG.MODES.diamond.properties.stretch;
+        const midPoint = createVector(
+          (start.x + end.x) / 2,
+          ((start.y + end.y) / 2) * stretch
+        );
+        
+        lines.push([start, midPoint]);
+        angles.push(degrees(p5.Vector.sub(midPoint, start).heading()));
+      }
+      attempts++;
+    }
+
+    return { lines, angles };
+  }
+
+  generateArcPattern(points) {
+    const lines = [];
+    const angles = [];
+    let attempts = 0;
+    const MAX_ATTEMPTS = 1000;
+
+    while (lines.length < this.state.maxLines && attempts < MAX_ATTEMPTS) {
+      const center = random(points);
+      const radius = random(this.state.cellSize * 0.2, this.state.cellSize * 0.4);
+      const startAngle = random(TWO_PI);
+      const arcSpan = radians(CONFIG.MODES.arc.properties.arcSpan);
+      
+      const start = createVector(
+        center.x + cos(startAngle) * radius,
+        center.y + sin(startAngle) * radius
+      );
+      const end = createVector(
+        center.x + cos(startAngle + arcSpan) * radius,
+        center.y + sin(startAngle + arcSpan) * radius
+      );
+
+      if (!start.equals(end)) {
+        lines.push([start, end, center, radius, startAngle]);
+        angles.push(degrees(startAngle));
+      }
+      attempts++;
+    }
+
+    return { lines, angles };
   }
 
   generateGridPoints(divisor = 4) {
@@ -253,19 +435,6 @@ class GenerativeArtwork {
         createVector(this.state.cellSize, this.state.cellSize),
       ]);
       angles.push(45);
-    }
-
-    return { lines, angles };
-  }
-
-  createParallelLines() {
-    const lines = [];
-    const angles = [];
-
-    for (let i = 0; i < this.state.maxLines; i++) {
-      const x = random(this.state.cellSize);
-      lines.push([createVector(x, 0), createVector(x, this.state.cellSize)]);
-      angles.push(90);
     }
 
     return { lines, angles };
@@ -321,59 +490,120 @@ class GenerativeArtwork {
     noStroke();
 
     lines.forEach((line, i) => {
-      fill(this.state.colors[i % this.state.colors.length]);
-      this.drawShape(line[0], line[1]);
+      const fillColor = this.state.colors[i % this.state.colors.length];
+      fill(fillColor);
+      this.drawShape(line[0], line[1], fillColor);
     });
   }
 
-  drawShape(start, end) {
-    const shapeDrawers = {
-      default: () => {
-        beginShape();
-        vertex(start.x, start.y);
-        vertex(end.x, end.y);
-        vertex(
-          (end.x + this.state.cellSize) % this.state.cellSize,
-          (end.y + this.state.cellSize) % this.state.cellSize
-        );
-        vertex(
-          (start.x + this.state.cellSize) % this.state.cellSize,
-          (start.y + this.state.cellSize) % this.state.cellSize
-        );
-        endShape(CLOSE);
-      },
+  drawShape(start, end, fillColor) {
+    const modeConfig = CONFIG.MODES[this.state.currentMode];
+    const props = this.state.properties || modeConfig.properties;
 
-      triangle: () => {
-        beginShape();
-        vertex(start.x, start.y);
-        vertex(end.x, end.y);
-        vertex(end.x, start.y);
-        endShape(CLOSE);
-      },
-
-      quadrilateral: () => {
-        beginShape();
-        vertex(start.x, start.y);
-        vertex(end.x, end.y);
-        vertex(
-          end.x + this.state.cellSize * 0.2,
-          end.y + this.state.cellSize * 0.1
-        );
-        vertex(
-          start.x + this.state.cellSize * 0.2,
-          start.y + this.state.cellSize * 0.1
-        );
-        endShape(CLOSE);
-      },
-    };
-
-    // Add shapeMode to state in constructor:
-    if (!this.state.shapeMode) {
-      this.state.shapeMode = "default";
+    push();
+    if (props.rotation) {
+      translate(this.state.cellSize / 2, this.state.cellSize / 2);
+      rotate(radians(props.rotation));
+      translate(-this.state.cellSize / 2, -this.state.cellSize / 2);
     }
 
-    // Draw the selected shape
-    shapeDrawers[this.state.shapeMode]();
+    strokeWeight(props.lineWidth || 2);
+    if (props.opacity !== undefined && props.opacity !== 1.0) {
+      const currentFill = color(fillColor);
+      fill(
+        red(currentFill),
+        green(currentFill),
+        blue(currentFill),
+        props.opacity * 255
+      );
+    }
+
+    switch (modeConfig.shapeMode) {
+      case "triangle":
+        this.drawTriangle(start, end);
+        break;
+      case "hexagon":
+        this.drawHexagon(start, end);
+        break;
+      case "diamond":
+        this.drawDiamond(start, end);
+        break;
+      case "arc":
+        this.drawArc(start, end);
+        break;
+      default:
+        this.drawDefault(start, end);
+    }
+
+    pop();
+  }
+
+  drawDefault(start, end) {
+    beginShape();
+    vertex(start.x, start.y);
+    vertex(end.x, end.y);
+    vertex(
+      (end.x + this.state.cellSize) % this.state.cellSize,
+      (end.y + this.state.cellSize) % this.state.cellSize
+    );
+    vertex(
+      (start.x + this.state.cellSize) % this.state.cellSize,
+      (start.y + this.state.cellSize) % this.state.cellSize
+    );
+    endShape(CLOSE);
+  }
+
+  drawTriangle(start, end) {
+    beginShape();
+    vertex(start.x, start.y);
+    vertex(end.x, end.y);
+    vertex(end.x, start.y);
+    endShape(CLOSE);
+  }
+
+  drawHexagon(start, end) {
+    beginShape();
+    const center = p5.Vector.add(start, end).mult(0.5);
+    const radius = p5.Vector.dist(start, center);
+    
+    for (let i = 0; i < 6; i++) {
+      const angle = i * TWO_PI / 6;
+      vertex(
+        center.x + cos(angle) * radius,
+        center.y + sin(angle) * radius
+      );
+    }
+    endShape(CLOSE);
+  }
+
+  drawDiamond(start, end) {
+    const stretch = CONFIG.MODES.diamond.properties.stretch;
+    beginShape();
+    vertex(start.x, start.y);
+    vertex(end.x, end.y);
+    vertex(end.x + this.state.cellSize * 0.2, end.y * stretch);
+    vertex(start.x + this.state.cellSize * 0.2, start.y * stretch);
+    endShape(CLOSE);
+  }
+
+  drawArc(start, end, center, radius, startAngle) {
+    if (!center) {
+      // Fallback if we don't have full arc data
+      this.drawDefault(start, end);
+      return;
+    }
+
+    const arcSpan = radians(CONFIG.MODES.arc.properties.arcSpan);
+    beginShape();
+    // Draw the arc
+    for (let a = 0; a <= arcSpan; a += PI/16) {
+      const x = center.x + cos(startAngle + a) * radius;
+      const y = center.y + sin(startAngle + a) * radius;
+      vertex(x, y);
+    }
+    // Close the shape
+    vertex(center.x, center.y);
+    endShape(CLOSE);
   }
 
   drawSignature() {
@@ -449,54 +679,23 @@ class GenerativeArtwork {
 
   handleKeyPress(key) {
     const actions = {
-      D: () => {
-        this.state.themeIndex =
-          (this.state.themeIndex + 1) % this.themes.length;
-        console.log("Theme:", this.themes[this.state.themeIndex].name);
-      },
-      X: () => {
-        const modes = ["default", "triangle", "quadrilateral"];
-        const currentIndex = modes.indexOf(this.state.shapeMode);
-        this.state.shapeMode = modes[(currentIndex + 1) % modes.length];
-        console.log("Shape Mode:", this.state.shapeMode);
-      },
-      M: () => {
-        const modes = ["default", "parallels", "dynamic"];
-        const currentIndex = modes.indexOf(this.state.mode);
-        this.state.mode = modes[(currentIndex + 1) % modes.length];
-        console.log("Mode:", this.state.mode);
-      },
-      A: () => {
-        this.state.seed = this.generateSeed();
-        console.log("New Seed:", this.state.seed);
-      },
-      C: () => {
-        this.state.colorIndex =
-          (this.state.colorIndex + 1) % this.state.colors.length;
-      },
-      V: () => {
-        CONFIG.SIGNATURE.VERTICAL_OFFSET += 10;
-      },
-      B: () => {
-        CONFIG.SIGNATURE.VERTICAL_OFFSET -= 10;
-      },
-      s: () => {
-        this.saveHighRes();
-        return false; // Don't regenerate pattern after saving
-      },
+      d: () => this.D(),
+      x: () => this.X(),
+      m: () => this.M(),
+      a: () => this.A(),
+      c: () => this.C(),
+      v: () => this.V(),
+      b: () => this.B(),
+      s: () => this.saveHighRes(),
     };
 
-    const upperKey = key.toUpperCase();
-
-    if (/[1-9]/.test(upperKey)) {
-      this.state.maxLines = parseInt(upperKey);
-      console.log("Max lines:", this.state.maxLines);
-      this.initializeWithSeed();
-      redraw();
-      return;
+    // Handle number keys for maxLines
+    if (!isNaN(key) && key > 0 && key <= 9) {
+      this.state.maxLines = parseInt(key);
+      return true;
     }
 
-    const action = actions[key] || actions[upperKey];
+    const action = actions[key.toLowerCase()];
     if (action) {
       const shouldRegenerate = action() !== false;
       if (shouldRegenerate) {
@@ -504,6 +703,64 @@ class GenerativeArtwork {
         redraw();
       }
     }
+  }
+
+  D() {
+    this.state.themeIndex = (this.state.themeIndex + 1) % this.themes.length;
+    console.log("Theme:", this.themes[this.state.themeIndex].name);
+    return true;
+  }
+
+  X() {
+    // Get all available modes
+    const modes = Object.keys(CONFIG.MODES);
+    // Find current mode index
+    const currentIndex = modes.indexOf(this.state.currentMode);
+    // Get next mode (or loop back to first)
+    const nextIndex = (currentIndex + 1) % modes.length;
+    // Update current mode
+    this.state.currentMode = modes[nextIndex];
+
+    // Apply mode settings
+    const modeConfig = CONFIG.MODES[this.state.currentMode];
+    this.state.maxLines = modeConfig.maxLines;
+    this.state.shapeMode = modeConfig.shapeMode;
+
+    // Apply mode properties
+    Object.assign(this.state, { properties: { ...modeConfig.properties } });
+
+    console.log(`Switched to ${modeConfig.name} mode`);
+    return true;
+  }
+
+  M() {
+    const modes = ["default", "parallels", "dynamic"];
+    const currentIndex = modes.indexOf(this.state.mode);
+    this.state.mode = modes[(currentIndex + 1) % modes.length];
+    console.log("Mode:", this.state.mode);
+    return true;
+  }
+
+  A() {
+    this.state.seed = this.generateSeed();
+    console.log("New Seed:", this.state.seed);
+    return true;
+  }
+
+  C() {
+    this.state.colorIndex =
+      (this.state.colorIndex + 1) % this.state.colors.length;
+    return true;
+  }
+
+  V() {
+    CONFIG.SIGNATURE.VERTICAL_OFFSET += 10;
+    return true;
+  }
+
+  B() {
+    CONFIG.SIGNATURE.VERTICAL_OFFSET -= 10;
+    return true;
   }
 
   saveHighRes() {

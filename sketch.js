@@ -1,489 +1,638 @@
-let cols, rows;
-let cellSize;
-let gridWidth = 10;
-let gridHeight = 10;
-let paddingTop = 80;
-let paddingBottom = 80;
-let paddingLeft = 80;
-let paddingRight = 80;
-let globalPattern = [];
-let globalColors = [];
-let maxLines = 5; // Maximum number of lines per pattern
-let themeIndex = 0; // Index to keep track of the current color theme
-let mode = "default"; // Modes: "default", "parallels", "dynamic"
-let seed = 0x7312876db4;
-const originalWidth = 4000;
-const originalHeight = 4400;
+// Constants and configuration
+const CONFIG = {
+  GRID: {
+    WIDTH: 10,
+    HEIGHT: 10,
+    PADDING: {
+      TOP: 80,
+      BOTTOM: 80,
+      LEFT: 80,
+      RIGHT: 80,
+    },
+  },
+  CANVAS: {
+    ORIGINAL_WIDTH: 4000,
+    ORIGINAL_HEIGHT: 4400,
+  },
+  SIGNATURE: {
+    TITLE_OFFSET_X: -180,
+    SEED_OFFSET_X: 125,
+    CUBE_OFFSET_Y: 15,
+    VERTICAL_OFFSET: -25,
+    TEXT_SIZE: 12,
+    CUBE_SIZE: 10,
+    CUBE_SPACING: 2,
+  },
+};
 
-let titleHorizontalOffset = -180; // Adjust horizontal position of title
-let seedHorizontalOffset = 125; // Adjust horizontal position of seed
-let cubeVerticalOffset = 15; // Adjust vertical offset position of the cubes
-let colorIndex = 0; // Index to keep track of the current color in the theme
-let signatureVerticalOffset = -25; // Global variable to adjust the vertical position of the entire signature
+class GenerativeArtwork {
+  constructor() {
+    this.state = {
+      cols: 0,
+      rows: 0,
+      cellSize: 0,
+      pattern: [],
+      colors: [],
+      maxLines: 5,
+      themeIndex: 0,
+      shapeMode: "default",
+      seed: "0xc3f7f484d5",
+      colorIndex: 0,
+    };
 
-let themes = [
-  {
-    name: "debug",
-    colors: ["#FFFFFF"],
-  },
-  {
-    name: "Default",
-    colors: ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF"],
-  },
-  {
-    name: "Earthy",
-    colors: ["#8B4513", "#FFD700", "#008000", "#4B0082", "#FF69B4", "#CD5C5C"],
-  },
-  {
-    name: "Pastel",
-    colors: ["#FF6347", "#40E0D0", "#EE82EE", "#F5DEB3", "#FFFFFF", "#000000"],
-  },
-  {
-    name: "Golid",
-    colors: ["#66aeaa", "#ffce3a", "#ff7044", "#5d5f46", "#000000"],
-  },
-  {
-    name: "Hobbs",
-    colors: ["#d12a2f", "#fcbc18", "#ebe4d8", "#29a691", "#b7d9cd"],
-  },
-  {
-    name: "Cathode",
-    colors: ["#a8216b", "#f1184c", "#f36943", "#f7dc66", "#b7d9cd"],
-  },
-  {
-    name: "Pop",
-    colors: ["#00ff3f", "#35b5ff", "#ff479c", "#fffb38"],
-  },
-  {
-    name: "Meadow",
-    colors: ["#556B2F", "#8FBC8F", "#FFD700", "#FF8C00", "#2E8B57"],
-  },
-  {
-    name: "Sunset",
-    colors: ["#FF4500", "#FF8C00", "#FFD700", "#2E8B57", "#6A5ACD"],
-  },
-]; // Array of color themes
+    this.pg = null; // Graphics buffer for high-resolution
+    this.themes = [
+      {
+        name: "Default",
+        colors: [
+          "#FF0000",
+          "#00FF00",
+          "#0000FF",
+          "#FFFF00",
+          "#FF00FF",
+          "#00FFFF",
+        ],
+      },
+      {
+        name: "Earthy",
+        colors: [
+          "#8B4513",
+          "#FFD700",
+          "#008000",
+          "#4B0082",
+          "#FF69B4",
+          "#CD5C5C",
+        ],
+      },
+      {
+        name: "Pastel",
+        colors: [
+          "#FF6347",
+          "#40E0D0",
+          "#EE82EE",
+          "#F5DEB3",
+          "#FFFFFF",
+          "#000000",
+        ],
+      },
+      {
+        name: "Golid",
+        colors: ["#66aeaa", "#ffce3a", "#ff7044", "#5d5f46", "#000000"],
+      },
+      {
+        name: "Hobbs",
+        colors: ["#d12a2f", "#fcbc18", "#ebe4d8", "#29a691", "#b7d9cd"],
+      },
+      {
+        name: "Cathode",
+        colors: ["#a8216b", "#f1184c", "#f36943", "#f7dc66", "#b7d9cd"],
+      },
+      { name: "Pop", colors: ["#00ff3f", "#35b5ff", "#ff479c", "#fffb38"] },
+      {
+        name: "Meadow",
+        colors: ["#556B2F", "#8FBC8F", "#FFD700", "#FF8C00", "#2E8B57"],
+      },
+      {
+        name: "Sunset",
+        colors: ["#FF4500", "#FF8C00", "#FFD700", "#2E8B57", "#6A5ACD"],
+      },
+      {
+        name: "Marguerita",
+        colors: ["#0A7029", "#FEDE00", "#C8DF52", "#DBE8D8"],
+      },
+      { name: "Apple", colors: ["#FF8370", "#00B1B0", "#FEC84D", "#E42256"] },
 
-let pg; // Graphics buffer for high-resolution image
-
-function generateSeed() {
-  let seed = "0x";
-  let chars = "0123456789abcdef";
-  for (let i = 0; i < 10; i++) {
-    seed += chars.charAt(Math.floor(Math.random() * chars.length));
+      (this.controls = {
+        D: "Cycle through color themes",
+        M: "Change pattern mode (default/parallels/dynamic)",
+        A: "Generate new seed",
+        C: "Cycle through colors for signature",
+        V: "Move signature up",
+        B: "Move signature down",
+        S: "Save high-resolution PNG",
+        "1-9": "Set number of lines in pattern",
+      }),
+    ];
   }
-  return seed;
+
+  generateSeed() {
+    const seed =
+      "0x" +
+      Array(10)
+        .fill()
+        .map(() => "0123456789abcdef"[Math.floor(Math.random() * 16)])
+        .join("");
+
+    // Ensure seed is valid hexadecimal
+    if (!/^0x[0-9a-f]{10}$/.test(seed)) {
+      console.warn("Invalid seed generated, using fallback");
+      return "0x9b8d5a395d"; // Fallback seed
+    }
+    return seed;
+  }
+
+  setup() {
+    createCanvas(windowWidth, windowHeight);
+    this.pg = createGraphics(
+      CONFIG.CANVAS.ORIGINAL_WIDTH,
+      CONFIG.CANVAS.ORIGINAL_HEIGHT
+    );
+    pixelDensity(1);
+    this.adjustCanvasSize();
+    this.adjustGridAndCellSize();
+    this.initializeWithSeed();
+    this.printControls();
+    noLoop();
+  }
+
+  printControls() {
+    console.log("=== Control Keys ===");
+    Object.entries(this.controls).forEach(([key, description]) => {
+      console.log(`${key}: ${description}`);
+    });
+    console.log("=================");
+  }
+
+  initializeWithSeed() {
+    console.log("Seed:", this.state.seed);
+    randomSeed(parseInt(this.state.seed, 16));
+    this.generatePatternAndColors();
+  }
+
+  adjustCanvasSize() {
+    const aspectRatio =
+      CONFIG.CANVAS.ORIGINAL_WIDTH / CONFIG.CANVAS.ORIGINAL_HEIGHT;
+    const newDimensions = this.calculateCanvasDimensions(aspectRatio);
+    resizeCanvas(newDimensions.width, newDimensions.height);
+  }
+
+  calculateCanvasDimensions(aspectRatio) {
+    if (windowWidth / windowHeight > aspectRatio) {
+      return { width: windowHeight * aspectRatio, height: windowHeight };
+    }
+    return { width: windowWidth, height: windowWidth / aspectRatio };
+  }
+
+  adjustGridAndCellSize() {
+    this.state.cols = CONFIG.GRID.WIDTH;
+    this.state.rows = CONFIG.GRID.HEIGHT;
+
+    const availableWidth = Math.max(
+      1,
+      width - CONFIG.GRID.PADDING.LEFT - CONFIG.GRID.PADDING.RIGHT
+    );
+    const availableHeight = Math.max(
+      1,
+      height - CONFIG.GRID.PADDING.TOP - CONFIG.GRID.PADDING.BOTTOM
+    );
+
+    this.state.cellSize = Math.max(
+      1,
+      min(availableWidth / this.state.cols, availableHeight / this.state.rows)
+    );
+  }
+
+  generatePatternAndColors() {
+    randomSeed(parseInt(this.state.seed, 16));
+    this.state.pattern = this.generatePattern();
+    this.state.colors = this.generateColors();
+  }
+
+  generatePattern() {
+    const points = this.generateGridPoints();
+    return this.createLines(points);
+  }
+
+  generateDefaultPattern() {
+    const points = this.generateGridPoints();
+    return this.createLines(points, false);
+  }
+
+  generateParallelPattern() {
+    const points = this.generateGridPoints(6);
+    return this.createParallelLines();
+  }
+
+  generateDynamicPattern() {
+    const points = this.generateGridPoints(4);
+    return this.createLines(points, true);
+  }
+
+  generateGridPoints(divisor = 4) {
+    const points = [];
+    const step = this.state.cellSize / divisor;
+    for (let x = 0; x <= this.state.cellSize; x += step) {
+      for (let y = 0; y <= this.state.cellSize; y += step) {
+        points.push(createVector(x, y));
+      }
+    }
+    return points;
+  }
+
+  createLines(points) {
+    const lines = [];
+    const angles = [];
+    let attempts = 0;
+    const MAX_ATTEMPTS = 1000;
+
+    while (lines.length < this.state.maxLines && attempts < MAX_ATTEMPTS) {
+      const start = random(points);
+      const end = random(points);
+
+      if (!start.equals(end)) {
+        lines.push([start, end]);
+        angles.push(degrees(p5.Vector.sub(end, start).heading()));
+      }
+      attempts++;
+    }
+
+    if (lines.length === 0) {
+      console.warn("No lines generated, adding fallback line");
+      lines.push([
+        createVector(0, 0),
+        createVector(this.state.cellSize, this.state.cellSize),
+      ]);
+      angles.push(45);
+    }
+
+    return { lines, angles };
+  }
+
+  createParallelLines() {
+    const lines = [];
+    const angles = [];
+
+    for (let i = 0; i < this.state.maxLines; i++) {
+      const x = random(this.state.cellSize);
+      lines.push([createVector(x, 0), createVector(x, this.state.cellSize)]);
+      angles.push(90);
+    }
+
+    return { lines, angles };
+  }
+
+  generateColors() {
+    const currentTheme = this.themes[this.state.themeIndex];
+    if (
+      !currentTheme ||
+      !currentTheme.colors ||
+      currentTheme.colors.length === 0
+    ) {
+      console.warn(
+        "Invalid theme or no colors available, using fallback theme"
+      );
+      this.state.themeIndex = 0;
+      return [color("#FF0000")];
+    }
+
+    // Generate a new array of colors for each line
+    return Array(this.state.pattern.lines.length)
+      .fill()
+      .map(() => {
+        const randomColor = random(currentTheme.colors);
+        return color(randomColor);
+      });
+  }
+
+  draw() {
+    background(40);
+    this.drawMainPattern();
+    this.drawSignature();
+  }
+
+  drawMainPattern() {
+    push();
+    translate(CONFIG.GRID.PADDING.LEFT, CONFIG.GRID.PADDING.TOP);
+
+    for (let i = 0; i < this.state.cols; i++) {
+      for (let j = 0; j < this.state.rows; j++) {
+        push();
+        translate(i * this.state.cellSize, j * this.state.cellSize);
+        this.drawPattern();
+        pop();
+      }
+    }
+
+    pop();
+  }
+
+  drawPattern() {
+    const { lines } = this.state.pattern;
+    noStroke();
+
+    lines.forEach((line, i) => {
+      fill(this.state.colors[i % this.state.colors.length]);
+      this.drawShape(line[0], line[1]);
+    });
+  }
+
+  drawShape(start, end) {
+    const shapeDrawers = {
+      default: () => {
+        beginShape();
+        vertex(start.x, start.y);
+        vertex(end.x, end.y);
+        vertex(
+          (end.x + this.state.cellSize) % this.state.cellSize,
+          (end.y + this.state.cellSize) % this.state.cellSize
+        );
+        vertex(
+          (start.x + this.state.cellSize) % this.state.cellSize,
+          (start.y + this.state.cellSize) % this.state.cellSize
+        );
+        endShape(CLOSE);
+      },
+
+      triangle: () => {
+        beginShape();
+        vertex(start.x, start.y);
+        vertex(end.x, end.y);
+        vertex(end.x, start.y);
+        endShape(CLOSE);
+      },
+
+      quadrilateral: () => {
+        beginShape();
+        vertex(start.x, start.y);
+        vertex(end.x, end.y);
+        vertex(
+          end.x + this.state.cellSize * 0.2,
+          end.y + this.state.cellSize * 0.1
+        );
+        vertex(
+          start.x + this.state.cellSize * 0.2,
+          start.y + this.state.cellSize * 0.1
+        );
+        endShape(CLOSE);
+      },
+    };
+
+    // Add shapeMode to state in constructor:
+    if (!this.state.shapeMode) {
+      this.state.shapeMode = "default";
+    }
+
+    // Draw the selected shape
+    shapeDrawers[this.state.shapeMode]();
+  }
+
+  drawSignature() {
+    const config = CONFIG.SIGNATURE;
+    const lineWidth = width * 0.75;
+    const centerX = width / 2;
+    const lineY =
+      height - CONFIG.GRID.PADDING.BOTTOM * 0.8 + config.VERTICAL_OFFSET;
+
+    this.drawSignatureLine(centerX, lineY, lineWidth);
+    this.drawSignatureText(centerX, lineY);
+    this.drawColorCubes(centerX, lineY);
+  }
+
+  drawSignatureLine(centerX, lineY, lineWidth) {
+    stroke(this.state.colors[this.state.colorIndex]);
+    strokeWeight(2);
+    line(centerX - lineWidth / 2, lineY, centerX + lineWidth / 2, lineY);
+    noStroke();
+  }
+
+  drawSignatureText(centerX, lineY) {
+    const config = CONFIG.SIGNATURE;
+    const textY = lineY + 10 + config.CUBE_SIZE / 2;
+
+    textFont("Helvetica");
+    textSize(config.TEXT_SIZE);
+    fill(this.state.colors[this.state.colorIndex]);
+
+    // Draw title
+    textAlign(RIGHT, CENTER);
+    text(
+      "GP // 1017",
+      centerX -
+        (this.state.colors.length * (config.CUBE_SIZE + config.CUBE_SPACING)) /
+          2 +
+        config.TITLE_OFFSET_X,
+      textY
+    );
+
+    // Draw seed
+    textAlign(LEFT, CENTER);
+    text(
+      `seed: ${this.state.seed}`,
+
+      centerX +
+        (this.state.colors.length * (config.CUBE_SIZE + config.CUBE_SPACING)) /
+          2 +
+        config.SEED_OFFSET_X,
+      textY
+    );
+  }
+
+  drawColorCubes(centerX, lineY) {
+    const config = CONFIG.SIGNATURE;
+    const colorsY = lineY + config.CUBE_OFFSET_Y;
+    const totalWidth =
+      this.state.colors.length * config.CUBE_SIZE +
+      (this.state.colors.length - 1) * config.CUBE_SPACING;
+    let x = centerX - totalWidth / 2;
+
+    this.state.colors.forEach((color) => {
+      fill(color);
+      rect(
+        x,
+        colorsY - config.CUBE_SIZE / 2,
+        config.CUBE_SIZE,
+        config.CUBE_SIZE
+      );
+      x += config.CUBE_SIZE + config.CUBE_SPACING;
+    });
+  }
+
+  handleKeyPress(key) {
+    const actions = {
+      D: () => {
+        this.state.themeIndex =
+          (this.state.themeIndex + 1) % this.themes.length;
+        console.log("Theme:", this.themes[this.state.themeIndex].name);
+      },
+      X: () => {
+        const modes = ["default", "triangle", "quadrilateral"];
+        const currentIndex = modes.indexOf(this.state.shapeMode);
+        this.state.shapeMode = modes[(currentIndex + 1) % modes.length];
+        console.log("Shape Mode:", this.state.shapeMode);
+      },
+      M: () => {
+        const modes = ["default", "parallels", "dynamic"];
+        const currentIndex = modes.indexOf(this.state.mode);
+        this.state.mode = modes[(currentIndex + 1) % modes.length];
+        console.log("Mode:", this.state.mode);
+      },
+      A: () => {
+        this.state.seed = this.generateSeed();
+        console.log("New Seed:", this.state.seed);
+      },
+      C: () => {
+        this.state.colorIndex =
+          (this.state.colorIndex + 1) % this.state.colors.length;
+      },
+      V: () => {
+        CONFIG.SIGNATURE.VERTICAL_OFFSET += 10;
+      },
+      B: () => {
+        CONFIG.SIGNATURE.VERTICAL_OFFSET -= 10;
+      },
+      s: () => {
+        this.saveHighRes();
+        return false; // Don't regenerate pattern after saving
+      },
+    };
+
+    const upperKey = key.toUpperCase();
+
+    if (/[1-9]/.test(upperKey)) {
+      this.state.maxLines = parseInt(upperKey);
+      console.log("Max lines:", this.state.maxLines);
+      this.initializeWithSeed();
+      redraw();
+      return;
+    }
+
+    const action = actions[key] || actions[upperKey];
+    if (action) {
+      const shouldRegenerate = action() !== false;
+      if (shouldRegenerate) {
+        this.initializeWithSeed();
+        redraw();
+      }
+    }
+  }
+
+  saveHighRes() {
+    console.log("Generating high-res image...");
+    this.pg.clear();
+    this.pg.background(40);
+
+    // Scale everything up
+    const scaleFactor = CONFIG.CANVAS.ORIGINAL_WIDTH / width;
+    const highResCellSize =
+      (CONFIG.CANVAS.ORIGINAL_WIDTH -
+        CONFIG.GRID.PADDING.LEFT * 2 * scaleFactor) /
+      this.state.cols;
+
+    // Draw patterns
+    this.pg.push();
+    this.pg.translate(
+      CONFIG.GRID.PADDING.LEFT * scaleFactor,
+      CONFIG.GRID.PADDING.TOP * scaleFactor
+    );
+
+    // Draw all cells
+    for (let i = 0; i < this.state.cols; i++) {
+      for (let j = 0; j < this.state.rows; j++) {
+        this.pg.push();
+        this.pg.translate(i * highResCellSize, j * highResCellSize);
+
+        // Draw shapes for this cell
+        this.state.pattern.lines.forEach((line, idx) => {
+          const scale = highResCellSize / this.state.cellSize;
+          const [start, end] = line;
+
+          this.pg.fill(this.state.colors[idx % this.state.colors.length]);
+          this.pg.noStroke();
+          this.pg.beginShape();
+          this.pg.vertex(start.x * scale, start.y * scale);
+          this.pg.vertex(end.x * scale, end.y * scale);
+          this.pg.vertex(
+            (end.x * scale + highResCellSize) % highResCellSize,
+            (end.y * scale + highResCellSize) % highResCellSize
+          );
+          this.pg.vertex(
+            (start.x * scale + highResCellSize) % highResCellSize,
+            (start.y * scale + highResCellSize) % highResCellSize
+          );
+          this.pg.endShape(CLOSE);
+        });
+
+        this.pg.pop();
+      }
+    }
+    this.pg.pop();
+
+    // Draw signature
+    const centerX = CONFIG.CANVAS.ORIGINAL_WIDTH / 2;
+    const lineY =
+      CONFIG.CANVAS.ORIGINAL_HEIGHT -
+      CONFIG.GRID.PADDING.BOTTOM * scaleFactor * 0.8 +
+      CONFIG.SIGNATURE.VERTICAL_OFFSET * scaleFactor;
+
+    // Draw signature line
+    this.pg.stroke(this.state.colors[this.state.colorIndex]);
+    this.pg.strokeWeight(2 * scaleFactor);
+    this.pg.line(
+      centerX - CONFIG.CANVAS.ORIGINAL_WIDTH * 0.375,
+      lineY,
+      centerX + CONFIG.CANVAS.ORIGINAL_WIDTH * 0.375,
+      lineY
+    );
+
+    // Draw text and cubes
+    const textY =
+      lineY + 10 * scaleFactor + (CONFIG.SIGNATURE.CUBE_SIZE * scaleFactor) / 2;
+    const cubeY = lineY + CONFIG.SIGNATURE.CUBE_OFFSET_Y * scaleFactor;
+    const scaledCubeSize = CONFIG.SIGNATURE.CUBE_SIZE * scaleFactor;
+    const scaledSpacing = CONFIG.SIGNATURE.CUBE_SPACING * scaleFactor;
+
+    this.pg.noStroke();
+    this.pg.textFont("Helvetica");
+    this.pg.textSize(CONFIG.SIGNATURE.TEXT_SIZE * scaleFactor);
+    this.pg.fill(this.state.colors[this.state.colorIndex]);
+
+    // Title and seed
+    this.pg.textAlign(this.pg.RIGHT, this.pg.CENTER);
+    this.pg.text("GP // 1017", centerX - 180 * scaleFactor, textY);
+    this.pg.textAlign(this.pg.LEFT, this.pg.CENTER);
+    this.pg.text(
+      `seed: ${this.state.seed}`,
+      centerX + 125 * scaleFactor,
+      textY
+    );
+
+    // Color cubes
+    let cubeX =
+      centerX -
+      (this.state.colors.length * (scaledCubeSize + scaledSpacing)) / 2;
+    this.state.colors.forEach((color) => {
+      this.pg.fill(color);
+      this.pg.rect(
+        cubeX,
+        cubeY - scaledCubeSize / 2,
+        scaledCubeSize,
+        scaledCubeSize
+      );
+      cubeX += scaledCubeSize + scaledSpacing;
+    });
+
+    saveCanvas(this.pg, `${this.state.seed}`, "png");
+    console.log("High-res image saved!");
+  }
 }
 
+// Global instance and p5.js setup
+let artwork;
+
 function setup() {
-  seed = generateSeed(); // Generate seed here
-  createCanvas(windowWidth, windowHeight); // Adjust canvas size to window size
-  pg = createGraphics(originalWidth, originalHeight); // Create high-resolution buffer
-  pixelDensity(1); // Ensure high-resolution saving
-  adjustCanvasSize();
-  adjustGridAndCellSize();
-  console.log("Seed:", seed);
-  randomSeed(parseInt(seed));
-  generateGlobalPatternAndColors();
-  noLoop();
+  artwork = new GenerativeArtwork();
+  artwork.setup();
 }
 
 function draw() {
-  background(40);
-  translate(paddingLeft, paddingTop); // Translate to start drawing with padding
-  drawPatterns();
-  resetMatrix(); // Reset the matrix before drawing the signature
-  drawSignature(); // Add signature to the canvas
-}
-
-function drawPatterns() {
-  for (let i = 0; i < cols; i++) {
-    for (let j = 0; j < rows; j++) {
-      push();
-      translate(i * cellSize, j * cellSize);
-      drawPatternFromPoints(globalPattern, globalColors);
-      pop();
-    }
-  }
-}
-
-function drawSignature() {
-  let lineWidth = width * 0.75;
-  let centerX = width / 2;
-  let lineY = height - paddingBottom * 0.8 + signatureVerticalOffset;
-  let colorCubeSize = 10;
-  let colorCubeSpacing = 2;
-  let colorsY = lineY + cubeVerticalOffset;
-
-  let seedTextSize = 12;
-  let titleTextSize = 12;
-  let horizontalPadding = 120; // Adjust horizontal padding as needed
-
-  let textY = lineY + 10 + colorCubeSize / 2; // Y-coordinate for title and seed text
-
-  stroke(globalColors[colorIndex]);
-  strokeWeight(2);
-  line(centerX - lineWidth / 2, lineY, centerX + lineWidth / 2, lineY);
-
-  noStroke();
-  textFont("Helvetica");
-
-  // Draw title text
-  textSize(titleTextSize);
-  textAlign(RIGHT, CENTER);
-  fill(globalColors[colorIndex]);
-  text(
-    "GP // 1005",
-    centerX -
-      (globalColors.length * (colorCubeSize + colorCubeSpacing)) / 2 +
-      titleHorizontalOffset,
-    textY
-  );
-
-  // Draw color cubes
-  let colorsXStart =
-    centerX -
-    (globalColors.length * colorCubeSize +
-      (globalColors.length - 1) * colorCubeSpacing) /
-      2;
-  for (let i = 0; i < globalColors.length; i++) {
-    fill(globalColors[i]);
-    rect(
-      colorsXStart + i * (colorCubeSize + colorCubeSpacing),
-      colorsY - colorCubeSize / 2,
-      colorCubeSize,
-      colorCubeSize
-    );
-  }
-
-  // Draw seed text
-  textSize(seedTextSize);
-  textAlign(LEFT, CENTER);
-  fill(globalColors[colorIndex]);
-  text(
-    `seed: ${seed}`,
-    centerX +
-      (globalColors.length * (colorCubeSize + colorCubeSpacing)) / 2 +
-      seedHorizontalOffset,
-    textY
-  );
-}
-
-function drawSignatureHighRes() {
-  let scaleFactor = originalWidth / width;
-
-  let lineWidth = originalWidth * 0.75;
-  let centerX = originalWidth / 2;
-  let lineY =
-    originalHeight -
-    paddingBottom * scaleFactor * 0.8 +
-    signatureVerticalOffset * scaleFactor;
-  let colorCubeSize = 10 * scaleFactor; // Adjusted for high resolution
-  let colorCubeSpacing = 2 * scaleFactor;
-  let colorsY = lineY + cubeVerticalOffset * scaleFactor;
-
-  let seedTextSize = 12 * scaleFactor;
-  let titleTextSize = 12 * scaleFactor;
-  let horizontalPadding = 120 * scaleFactor; // Adjust horizontal padding as needed
-
-  let textY = lineY + 10 * scaleFactor + colorCubeSize / 2; // Y-coordinate for title and seed text
-
-  pg.stroke(globalColors[colorIndex]);
-  pg.strokeWeight(2 * scaleFactor);
-  pg.line(centerX - lineWidth / 2, lineY, centerX + lineWidth / 2, lineY);
-
-  pg.noStroke();
-  pg.textFont("Helvetica");
-
-  // Draw title text
-  pg.textSize(titleTextSize);
-  pg.textAlign(pg.RIGHT, pg.CENTER);
-  pg.fill(globalColors[colorIndex]);
-  pg.text(
-    "GP // 1005",
-    centerX -
-      (globalColors.length * (colorCubeSize + colorCubeSpacing)) / 2 +
-      titleHorizontalOffset * scaleFactor,
-    textY
-  );
-
-  // Draw color cubes
-  let colorsXStart =
-    centerX -
-    (globalColors.length * colorCubeSize +
-      (globalColors.length - 1) * colorCubeSpacing) /
-      2;
-  for (let i = 0; i < globalColors.length; i++) {
-    pg.fill(globalColors[i]);
-    pg.rect(
-      colorsXStart + i * (colorCubeSize + colorCubeSpacing),
-      colorsY - colorCubeSize / 2,
-      colorCubeSize,
-      colorCubeSize
-    );
-  }
-
-  // Draw seed text
-  pg.textSize(seedTextSize);
-  pg.textAlign(pg.LEFT, pg.CENTER);
-  pg.fill(globalColors[colorIndex]);
-  pg.text(
-    `seed: ${seed}`,
-    centerX +
-      (globalColors.length * (colorCubeSize + colorCubeSpacing)) / 2 +
-      seedHorizontalOffset * scaleFactor,
-    textY
-  );
-}
-
-function drawHighResPatterns() {
-  let scaleFactor = originalWidth / width;
-
-  let scaledPaddingTop = paddingTop * scaleFactor;
-  let scaledPaddingBottom = paddingBottom * scaleFactor;
-  let scaledPaddingLeft = paddingLeft * scaleFactor;
-  let scaledPaddingRight = paddingRight * scaleFactor;
-
-  pg.background(40);
-  pg.translate(scaledPaddingLeft, scaledPaddingTop); // Translate to start drawing with padding
-  let highResCellSize =
-    (originalWidth - scaledPaddingLeft - scaledPaddingRight) / cols;
-  for (let i = 0; i < cols; i++) {
-    for (let j = 0; j < rows; j++) {
-      pg.push();
-      pg.translate(i * highResCellSize, j * highResCellSize);
-      drawPatternFromPointsHighRes(
-        globalPattern,
-        globalColors,
-        highResCellSize
-      );
-      pg.pop();
-    }
-  }
-  pg.translate(-scaledPaddingLeft, -scaledPaddingTop); // Reset translation
-  drawSignatureHighRes();
+  artwork.draw();
 }
 
 function windowResized() {
-  resizeCanvas(windowWidth, windowHeight);
-  adjustCanvasSize();
-  adjustGridAndCellSize();
-  randomSeed(parseInt(seed));
-  generateGlobalPatternAndColors();
+  artwork.setup();
   redraw();
 }
 
-function adjustCanvasSize() {
-  let aspectRatio = originalWidth / originalHeight;
-  if (windowWidth / windowHeight > aspectRatio) {
-    let newWidth = windowHeight * aspectRatio;
-    resizeCanvas(newWidth, windowHeight);
-  } else {
-    let newHeight = windowWidth / aspectRatio;
-    resizeCanvas(windowWidth, newHeight);
-  }
-}
-
-function adjustGridAndCellSize() {
-  cols = gridWidth;
-  rows = gridHeight;
-  let availableWidth = width - paddingLeft - paddingRight;
-  let availableHeight = height - paddingTop - paddingBottom;
-  cellSize = min(availableWidth / cols, availableHeight / rows); // Adjust cell size based on available space
-}
-
-function generateGlobalPatternAndColors() {
-  randomSeed(parseInt(seed)); // Ensure consistency in randomness
-  if (mode === "default") {
-    globalPattern = generatePattern(cellSize, maxLines);
-  } else if (mode === "parallels") {
-    globalPattern = generateParallelPattern(cellSize, maxLines);
-  } else if (mode === "dynamic") {
-    globalPattern = generateDynamicPattern(cellSize, maxLines);
-  }
-
-  globalColors = generateColors(globalPattern);
-}
-
-function generatePattern(size, numLines) {
-  let points = [];
-  let lines = [];
-  let angles = [];
-
-  // Generate a grid of points
-  let step = size / 4;
-  for (let x = 0; x <= size; x += step) {
-    for (let y = 0; y <= size; y += step) {
-      points.push(createVector(x, y));
-    }
-  }
-
-  // Ensure we always have the exact number of lines
-  while (lines.length < numLines) {
-    let start = random(points);
-    let end = random(points);
-
-    if (!start.equals(end)) {
-      lines.push([start, end]);
-      angles.push(degrees(p5.Vector.sub(end, start).heading()));
-    }
-  }
-
-  return { lines, angles };
-}
-
-function generateParallelPattern(size, numLines) {
-  let points = [];
-  let lines = [];
-  let angles = [];
-  let increment = size / 6;
-
-  for (let x = 0; x <= size; x += increment) {
-    for (let y = 0; y <= size; y += increment) {
-      points.push(createVector(x, y));
-    }
-  }
-
-  for (let i = 0; i < numLines; i++) {
-    let start = createVector(random(points).x, 0);
-    let end = createVector(start.x, size);
-    lines.push([start, end]);
-    angles.push(90);
-  }
-
-  return { lines, angles };
-}
-
-function generateDynamicPattern(size, numLines) {
-  let points = [];
-  let lines = [];
-  let angles = [];
-  let increment = size / 4;
-
-  for (let x = 0; x <= size; x += increment) {
-    for (let y = 0; y <= size; y += increment) {
-      points.push(createVector(x, y));
-    }
-  }
-
-  while (lines.length < numLines) {
-    let start = random(points);
-    let end = random(points);
-
-    if (!start.equals(end)) {
-      lines.push([start, end]);
-      angles.push(degrees(p5.Vector.sub(end, start).heading()));
-    }
-  }
-
-  return { lines, angles };
-}
-
-function drawPatternFromPoints(pattern, patternColors) {
-  let lines = pattern.lines;
-  noStroke();
-  if (lines.length === 0) {
-    console.error("No lines to draw!");
-    return;
-  }
-  for (let i = 0; i < lines.length; i++) {
-    fill(patternColors[i % patternColors.length]);
-    let start = lines[i][0];
-    let end = lines[i][1];
-    if (start && end) {
-      beginShape();
-      vertex(start.x, start.y);
-      vertex(end.x, end.y);
-      vertex((end.x + cellSize) % cellSize, (end.y + cellSize) % cellSize);
-      vertex((start.x + cellSize) % cellSize, (start.y + cellSize) % cellSize);
-      endShape(CLOSE);
-    }
-  }
-}
-
-function drawPatternFromPointsHighRes(pattern, patternColors, highResCellSize) {
-  let lines = pattern.lines;
-  pg.noStroke();
-  if (lines.length === 0) {
-    console.error("No lines to draw!");
-    return;
-  }
-  for (let i = 0; i < lines.length; i++) {
-    pg.fill(patternColors[i % patternColors.length]);
-    let start = lines[i][0].copy().mult(highResCellSize / cellSize);
-    let end = lines[i][1].copy().mult(highResCellSize / cellSize);
-    if (start && end) {
-      pg.beginShape();
-      pg.vertex(start.x, start.y);
-      pg.vertex(end.x, end.y);
-      pg.vertex(
-        (end.x + highResCellSize) % highResCellSize,
-        (end.y + highResCellSize) % highResCellSize
-      );
-      pg.vertex(
-        (start.x + highResCellSize) % highResCellSize,
-        (start.y + highResCellSize) % highResCellSize
-      );
-      pg.endShape(CLOSE);
-    }
-  }
-}
-
-function generateColors(pattern) {
-  let lines = pattern.lines;
-  let patternColors = [];
-  for (let i = 0; i < lines.length; i++) {
-    let c = color(random(themes[themeIndex].colors));
-    patternColors.push(c);
-  }
-  return patternColors;
-}
-
 function keyPressed() {
-  let upperKey = key.toUpperCase();
-  if (upperKey === "D") {
-    themeIndex = (themeIndex + 1) % themes.length;
-    console.log("Theme:", themes[themeIndex].name);
-    randomSeed(parseInt(seed));
-    generateGlobalPatternAndColors();
-    redraw();
-  } else if (upperKey >= "1" && upperKey <= "9") {
-    maxLines = int(upperKey);
-    console.log("Max lines:", maxLines);
-    randomSeed(parseInt(seed));
-    generateGlobalPatternAndColors();
-    redraw();
-  } else if (upperKey === "M") {
-    if (mode === "default") mode = "parallels";
-    else if (mode === "parallels") mode = "dynamic";
-    else mode = "default";
-    console.log("Mode:", mode);
-    randomSeed(parseInt(seed));
-    generateGlobalPatternAndColors();
-    redraw();
-  } else if (upperKey === "A") {
-    seed = generateSeed();
-    console.log("New Seed:", seed);
-    randomSeed(parseInt(seed));
-    generateGlobalPatternAndColors();
-    redraw();
-  } else if (upperKey === "C") {
-    colorIndex = (colorIndex + 1) % globalColors.length;
-    redraw();
-  } else if (upperKey === "V") {
-    // Increase signature vertical offset
-    signatureVerticalOffset += 10;
-    redraw();
-  } else if (upperKey === "B") {
-    // Decrease signature vertical offset
-    signatureVerticalOffset -= 10;
-    redraw();
-  }
-}
-
-function keyTyped() {
-  if (key === "s") {
-    drawHighResPatterns();
-    pg.save(`${seed}.png`);
-  }
+  artwork.handleKeyPress(key);
 }

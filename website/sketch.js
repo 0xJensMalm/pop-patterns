@@ -1,6 +1,6 @@
 // Constants and configuration
 const CONFIG = {
-  MODES: MODES,  // Now imported from modes.js
+  MODES: MODES, // Now imported from modes.js
   GRID: {
     WIDTH: 10,
     HEIGHT: 10,
@@ -39,6 +39,7 @@ class GenerativeArtwork {
       currentMode: "default",
       seed: "0xc3f7f484d5",
       colorIndex: 0,
+      signatureColors: false,
     };
 
     this.pg = null; // Graphics buffer for high-resolution
@@ -258,13 +259,14 @@ class GenerativeArtwork {
 
     while (lines.length < this.state.maxLines && attempts < MAX_ATTEMPTS) {
       const center = random(points);
-      const radius = this.state.cellSize * CONFIG.MODES.hexagon.properties.radius;
+      const radius =
+        this.state.cellSize * CONFIG.MODES.hexagon.properties.radius;
       const startAngle = random(TWO_PI);
-      
+
       // Generate two connected points on the hexagon
       const angle1 = startAngle;
       const angle2 = startAngle + TWO_PI / 6;
-      
+
       const start = createVector(
         center.x + cos(angle1) * radius,
         center.y + sin(angle1) * radius
@@ -293,14 +295,14 @@ class GenerativeArtwork {
     while (lines.length < this.state.maxLines && attempts < MAX_ATTEMPTS) {
       const start = random(points);
       const end = random(points);
-      
+
       if (!start.equals(end)) {
         const stretch = CONFIG.MODES.diamond.properties.stretch;
         const midPoint = createVector(
           (start.x + end.x) / 2,
           ((start.y + end.y) / 2) * stretch
         );
-        
+
         lines.push([start, midPoint]);
         angles.push(degrees(p5.Vector.sub(midPoint, start).heading()));
       }
@@ -318,10 +320,13 @@ class GenerativeArtwork {
 
     while (lines.length < this.state.maxLines && attempts < MAX_ATTEMPTS) {
       const center = random(points);
-      const radius = random(this.state.cellSize * 0.2, this.state.cellSize * 0.4);
+      const radius = random(
+        this.state.cellSize * 0.2,
+        this.state.cellSize * 0.4
+      );
       const startAngle = random(TWO_PI);
       const arcSpan = radians(CONFIG.MODES.arc.properties.arcSpan);
-      
+
       const start = createVector(
         center.x + cos(startAngle) * radius,
         center.y + sin(startAngle) * radius
@@ -506,13 +511,10 @@ class GenerativeArtwork {
     beginShape();
     const center = p5.Vector.add(start, end).mult(0.5);
     const radius = p5.Vector.dist(start, center);
-    
+
     for (let i = 0; i < 6; i++) {
-      const angle = i * TWO_PI / 6;
-      vertex(
-        center.x + cos(angle) * radius,
-        center.y + sin(angle) * radius
-      );
+      const angle = (i * TWO_PI) / 6;
+      vertex(center.x + cos(angle) * radius, center.y + sin(angle) * radius);
     }
     endShape(CLOSE);
   }
@@ -537,7 +539,7 @@ class GenerativeArtwork {
     const arcSpan = radians(CONFIG.MODES.arc.properties.arcSpan);
     beginShape();
     // Draw the arc
-    for (let a = 0; a <= arcSpan; a += PI/16) {
+    for (let a = 0; a <= arcSpan; a += PI / 16) {
       const x = center.x + cos(startAngle + a) * radius;
       const y = center.y + sin(startAngle + a) * radius;
       vertex(x, y);
@@ -577,7 +579,7 @@ class GenerativeArtwork {
     // Draw title
     textAlign(RIGHT, CENTER);
     text(
-      "GP // 1017",
+      "Gridlock - by kromo",
       centerX -
         (this.state.colors.length * (config.CUBE_SIZE + config.CUBE_SPACING)) /
           2 +
@@ -618,6 +620,28 @@ class GenerativeArtwork {
     });
   }
 
+  updateStatusDisplay() {
+    // Update current mode
+    const modeElement = document.getElementById("current-mode");
+    if (modeElement) {
+      modeElement.textContent =
+        this.state.currentMode.charAt(0).toUpperCase() +
+        this.state.currentMode.slice(1);
+    }
+
+    // Update current theme
+    const themeElement = document.getElementById("current-theme");
+    if (themeElement) {
+      themeElement.textContent = this.themes[this.state.themeIndex].name;
+    }
+
+    // Update current seed
+    const seedElement = document.getElementById("current-seed");
+    if (seedElement) {
+      seedElement.textContent = this.state.seed;
+    }
+  }
+
   handleKeyPress(key) {
     const actions = {
       d: () => this.D(),
@@ -644,6 +668,7 @@ class GenerativeArtwork {
         redraw();
       }
     }
+    this.updateStatusDisplay();
   }
 
   D() {
@@ -666,7 +691,7 @@ class GenerativeArtwork {
     console.log("Mode changed to:", {
       name: CONFIG.MODES[this.state.currentMode].name,
       maxLines: CONFIG.MODES[this.state.currentMode].maxLines,
-      properties: CONFIG.MODES[this.state.currentMode].properties
+      properties: CONFIG.MODES[this.state.currentMode].properties,
     });
 
     // Apply mode settings
@@ -793,7 +818,7 @@ class GenerativeArtwork {
 
     // Title and seed
     this.pg.textAlign(this.pg.RIGHT, this.pg.CENTER);
-    this.pg.text("GP // 1017", centerX - 180 * scaleFactor, textY);
+    this.pg.text("Gridlock algorithm", centerX - 180 * scaleFactor, textY);
     this.pg.textAlign(this.pg.LEFT, this.pg.CENTER);
     this.pg.text(
       `seed: ${this.state.seed}`,

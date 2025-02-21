@@ -42,6 +42,7 @@ class GenerativeArtwork {
       signatureColors: false,
     };
 
+    this.stateHistory = []; // Add state history array
     this.pg = null; // Graphics buffer for high-resolution
     this.themes = [
       {
@@ -103,18 +104,17 @@ class GenerativeArtwork {
         colors: ["#0A7029", "#FEDE00", "#C8DF52", "#DBE8D8"],
       },
       { name: "Apple", colors: ["#FF8370", "#00B1B0", "#FEC84D", "#E42256"] },
-
-      (this.controls = {
-        D: "Cycle through color themes",
-        M: "Change pattern mode (default/parallels/dynamic)",
-        A: "Generate new seed",
-        C: "Cycle through colors for signature",
-        V: "Move signature up",
-        B: "Move signature down",
-        S: "Save high-resolution PNG",
-        "1-9": "Set number of lines in pattern",
-      }),
     ];
+
+    this.controls = {
+      d: "Generate new pattern",
+      a: "Go to previous pattern",
+      s: "Change shape mode",
+      c: "Change color theme",
+      v: "Toggle signature colors",
+      S: "Save high-resolution PNG",
+      "1-9": "Set number of lines in pattern",
+    };
   }
 
   generateSeed() {
@@ -579,7 +579,7 @@ class GenerativeArtwork {
     // Draw title
     textAlign(RIGHT, CENTER);
     text(
-      "Gridlock - by kromo",
+      "GRIDLOCK",
       centerX -
         (this.state.colors.length * (config.CUBE_SIZE + config.CUBE_SPACING)) /
           2 +
@@ -643,96 +643,46 @@ class GenerativeArtwork {
   }
 
   handleKeyPress(key) {
-    const actions = {
-      d: () => this.D(),
-      x: () => this.X(),
-      m: () => this.M(),
-      a: () => this.A(),
-      c: () => this.C(),
-      v: () => this.V(),
-      b: () => this.B(),
-      s: () => this.saveHighRes(),
-    };
+    let needsRedraw = false;
 
-    // Handle number keys for maxLines
-    if (!isNaN(key) && key > 0 && key <= 9) {
+    // Save current state before any changes
+    if (key === "d") {
+      this.stateHistory.push({ ...this.state }); // Save current state before generating new one
+      this.state.seed = this.generateSeed();
+      needsRedraw = true;
+    } else if (key === "a" && this.stateHistory.length > 0) {
+      this.state = this.stateHistory.pop(); // Restore previous state
+      needsRedraw = true;
+    } else if (key === "s") {
+      needsRedraw = this.cycleShapeMode();
+    } else if (key === "c") {
+      this.state.themeIndex = (this.state.themeIndex + 1) % this.themes.length;
+      needsRedraw = true;
+    } else if (key === "v") {
+      this.state.signatureColors = !this.state.signatureColors;
+      needsRedraw = true;
+    } else if (key === "S") {
+      this.saveHighRes();
+      needsRedraw = false;
+    } else if (key >= "1" && key <= "9") {
       this.state.maxLines = parseInt(key);
-      return true;
+      needsRedraw = true;
     }
 
-    const action = actions[key.toLowerCase()];
-    if (action) {
-      const shouldRegenerate = action() !== false;
-      if (shouldRegenerate) {
-        this.initializeWithSeed();
-        redraw();
+    if (needsRedraw) {
+      if (needsRedraw !== "skip-pattern") {
+        this.generatePatternAndColors();
       }
+      this.updateStatusDisplay();
+      redraw();
     }
-    this.updateStatusDisplay();
   }
 
-  D() {
-    this.state.themeIndex = (this.state.themeIndex + 1) % this.themes.length;
-    console.log("Theme:", this.themes[this.state.themeIndex].name);
-    return true;
-  }
-
-  X() {
-    // Get all available modes
-    const modes = Object.keys(CONFIG.MODES);
-    // Find current mode index
+  cycleShapeMode() {
+    const modes = Object.keys(MODES);
     const currentIndex = modes.indexOf(this.state.currentMode);
-    // Get next mode (or loop back to first)
-    const nextIndex = (currentIndex + 1) % modes.length;
-    // Update current mode
-    this.state.currentMode = modes[nextIndex];
-
-    // Log mode change with details
-    console.log("Mode changed to:", {
-      name: CONFIG.MODES[this.state.currentMode].name,
-      maxLines: CONFIG.MODES[this.state.currentMode].maxLines,
-      properties: CONFIG.MODES[this.state.currentMode].properties,
-    });
-
-    // Apply mode settings
-    const modeConfig = CONFIG.MODES[this.state.currentMode];
-    this.state.maxLines = modeConfig.maxLines;
-    this.state.shapeMode = modeConfig.shapeMode;
-
-    // Apply mode properties
-    Object.assign(this.state, { properties: { ...modeConfig.properties } });
-
-    console.log(`Switched to ${modeConfig.name} mode`);
-    return true;
-  }
-
-  M() {
-    const modes = ["default", "parallels", "dynamic"];
-    const currentIndex = modes.indexOf(this.state.mode);
-    this.state.mode = modes[(currentIndex + 1) % modes.length];
-    console.log("Mode:", this.state.mode);
-    return true;
-  }
-
-  A() {
-    this.state.seed = this.generateSeed();
-    console.log("New Seed:", this.state.seed);
-    return true;
-  }
-
-  C() {
-    this.state.colorIndex =
-      (this.state.colorIndex + 1) % this.state.colors.length;
-    return true;
-  }
-
-  V() {
-    CONFIG.SIGNATURE.VERTICAL_OFFSET += 10;
-    return true;
-  }
-
-  B() {
-    CONFIG.SIGNATURE.VERTICAL_OFFSET -= 10;
+    this.state.currentMode = modes[(currentIndex + 1) % modes.length];
+    console.log("Mode:", this.state.currentMode);
     return true;
   }
 
